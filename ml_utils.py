@@ -65,7 +65,8 @@ def compare_models(df, features, test_size = 0.3, seed = 325):
                 n_estimators = 200,
                 max_depth = 6,
                 learning_rate = 0.1,
-                random_state = seed
+                random_state = seed,
+                n_jobs = -1
             ))
         ]),
         
@@ -75,7 +76,8 @@ def compare_models(df, features, test_size = 0.3, seed = 325):
                 C = 1.0,
                 class_weight = 'balanced',
                 max_iter = 1000,
-                random_state = seed
+                random_state = seed,
+                n_jobs = -1
             ))
         ]),
         
@@ -87,7 +89,8 @@ def compare_models(df, features, test_size = 0.3, seed = 325):
                 gamma = 'scale',
                 class_weight = 'balanced',
                 probability = True,
-                random_state = seed
+                random_state = seed,
+                n_jobs = -1
             ))
         ])
     }
@@ -501,18 +504,21 @@ def test_feature_subsets(df, all_features, importances_df, best_params,
        
     results_df = pd.DataFrame(results)
     
-    # plot performance metrics    
-    fig, ax = plt.subplots(1, 1, figsize = (9, 4))
+    # plot balanced accuracy with best highlighted    
+    fig, ax = plt.subplots(1, 1, figsize = (4, 4))
 
-    ax.plot(results_df['n_features'], results_df['accuracy'], 
-            marker = 'o', label = 'Accuracy', linewidth = 2)
-    ax.plot(results_df['n_features'], results_df['balanced_accuracy'],
-            marker = 's', label = 'Balanced accuracy', linewidth = 2)
-    ax.plot(results_df['n_features'], results_df['f1_macro'],
-            marker = '^', label = 'F1 (macro)', linewidth = 2)
+    best_idx = results_df['balanced_accuracy'].idxmax()
+    best_n = results_df.loc[best_idx, 'n_features']
+    best_score = results_df.loc[best_idx, 'balanced_accuracy']
+    
+    ax.plot(results_df['n_features'], results_df['balanced_accuracy'], 
+            marker = 'o', linewidth = 2, color = 'b')
+    ax.scatter([best_n], [best_score], color = 'r', zorder = 5, 
+               label = f'Best: {best_n} features ({best_score:.3f})')
+    ax.axvline(best_n, color = 'r', linestyle = '--')
     ax.set_xlabel('Number of features')
-    ax.set_ylabel('Score')
-    ax.set_title('Performance vs. number of features')
+    ax.set_ylabel('Balanced accuracy')
+    ax.set_title('Optimal feature subset size')
     ax.legend()
     ax.set_xticks(n_features_to_test)
     ax.set_ylim([0.55, 0.7])
