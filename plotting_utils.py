@@ -537,7 +537,7 @@ def plot_bycycle(bycycle_baseline, bycycle_sham, bycycle_tacs, bycycle_tdcs):
     """    
     # parameters to plot
     params = {
-        'amplitude': 'Amplitude',
+        'amplitude': 'Amplitude (μV)',
         'period': 'Period (ms)',
         'rise_time': 'Rise time (ms)',
         'decay_time': 'Decay time (ms)',

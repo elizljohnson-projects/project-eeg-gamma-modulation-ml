@@ -65,8 +65,7 @@ def compare_models(df, features, test_size = 0.3, seed = 325):
                 n_estimators = 200,
                 max_depth = 6,
                 learning_rate = 0.1,
-                random_state = seed,
-                n_jobs = -1
+                random_state = seed
             ))
         ]),
         
@@ -89,8 +88,7 @@ def compare_models(df, features, test_size = 0.3, seed = 325):
                 gamma = 'scale',
                 class_weight = 'balanced',
                 probability = True,
-                random_state = seed,
-                n_jobs = -1
+                random_state = seed
             ))
         ])
     }
@@ -400,15 +398,6 @@ def rank_features(df, features, best_model):
     plt.tight_layout()
     plt.show()
     
-    # find cutoffs
-    n_80 = (importances_df['cumulative_pct'] >= 80).idxmax() + 1
-    n_90 = (importances_df['cumulative_pct'] >= 90).idxmax() + 1
-    n_95 = (importances_df['cumulative_pct'] >= 95).idxmax() + 1
-    
-    print(f'Top {n_80} features capture 80% of importance')
-    print(f'Top {n_90} features capture 90% of importance')
-    print(f'Top {n_95} features capture 95% of importance')
-    
     return importances_df
 
 def test_feature_subsets(df, all_features, importances_df, best_params, 
@@ -435,8 +424,9 @@ def test_feature_subsets(df, all_features, importances_df, best_params,
     --------
     results_df : pandas.DataFrame
         Performance metrics for different feature subset sizes
-    """
-    
+    best_n : int
+        Optimal number of features (highest balanced accuracy)
+    """    
     # ensure all_features is a list
     if not isinstance(all_features, list):
         all_features = list(all_features)
@@ -545,12 +535,13 @@ def test_feature_subsets(df, all_features, importances_df, best_params,
     print(f'       {class_labels[1]:<6} {cm[1,0]:<8} {cm[1,1]:<8} {cm[1,2]:<8}')
     print(f'       {class_labels[2]:<6} {cm[2,0]:<8} {cm[2,1]:<8} {cm[2,2]:<8}')
     
-    return results_df
+    return results_df, best_n
 
 def permutation_test(df, selected_features, best_params, nperm = 100, 
                      test_size = 0.3, seed = 325):
     """
-    Permutation test: shuffle condition labels and retrain to verify model learns real patterns.
+    Permutation test: randomly reassign subjects to conditions and retrain to verify 
+    model learns condition-specific patterns rather than individual differences.
     
     Parameters:
     -----------
@@ -571,15 +562,15 @@ def permutation_test(df, selected_features, best_params, nperm = 100,
     --------
     results : dict
         Dictionary with real and permuted scores, p-value, and visualizations
-    """
-    
+    """    
     # prepare data with selected features
     X = df[selected_features].values
     y = df['group'].values
+    sid = df['sid'].values
     
-    # split data (same split as in final model)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
+    # split data
+    X_train, X_test, y_train, y_test, sid_train, sid_test = train_test_split(
+        X, y, sid,
         test_size = test_size,
         stratify = y,
         random_state = seed
@@ -591,12 +582,16 @@ def permutation_test(df, selected_features, best_params, nperm = 100,
     
     # extract model params
     model_params = {k.replace('classifier__', ''): v for k, v in best_params.items()}
+
+    # create pipeline (as in compare_models)
+    pipeline = Pipeline([
+        ('classifier', GradientBoostingClassifier(**model_params, random_state = seed))
+    ])
     
     # train model with real labels
     print('Training model with real labels...')
-    model_real = GradientBoostingClassifier(**model_params, random_state = seed)
-    model_real.fit(X_train, y_train)
-    y_pred_real = model_real.predict(X_test)
+    pipeline.fit(X_train, y_train)
+    y_pred_real = pipeline.predict(X_test)
     
     real_accuracy = accuracy_score(y_test, y_pred_real)
     real_balanced_acc = balanced_accuracy_score(y_test, y_pred_real)
@@ -606,6 +601,14 @@ def permutation_test(df, selected_features, best_params, nperm = 100,
     print(f'  Accuracy:          {real_accuracy:.3f}')
     print(f'  Balanced accuracy: {real_balanced_acc:.3f}')
     print(f'  F1 (macro):        {real_f1:.3f}\n')
+
+    # get all unique subjects in the dataset
+    unique_sid = np.unique(sid)
+    n_sid = len(unique_sid)
+    
+    # determine subjects per condition
+    conditions = np.unique(y)
+    n_per_cond = n_sid // 3
     
     # run permutation tests with shuffled labels
     permuted_scores = []
@@ -614,16 +617,31 @@ def permutation_test(df, selected_features, best_params, nperm = 100,
         if i % round(nperm / 10) == 0:
             print(f'Processing permutation {i+1} of {nperm}...')
         
-        # shuffle training labels
-        y_train_shuffled = np.random.RandomState(seed + i).permutation(y_train)
-        
-        # train model with shuffled labels
-        model_perm = GradientBoostingClassifier(**model_params, random_state = seed + i)
-        model_perm.fit(X_train, y_train_shuffled)
-        
-        # evaluate on test set (with real labels)
-        y_pred_perm = model_perm.predict(X_test)
-        balanced_acc_perm = balanced_accuracy_score(y_test, y_pred_perm)
+        # randomly shuffle subjects and assign to conditions
+        shuffled_sid = np.random.RandomState(seed + i).permutation(unique_sid)
+
+        # create subject-to-condition mapping
+        sid_to_cond = {}
+        for idx, condition in enumerate(conditions):
+            start_idx = idx * n_per_cond
+            end_idx = start_idx + n_per_cond if idx < 2 else n_sid
+            assigned_sid = shuffled_sid[start_idx:end_idx]
+            for subj in assigned_sid:
+                sid_to_cond[subj] = condition
+
+        # apply shuffled labels to training set based on subject ID
+        y_train_shuffled = np.array([sid_to_cond[subj] for subj in sid_train])
+
+        # train model with shuffled subject-to-condition mapping
+        pipeline_perm = Pipeline([
+            ('classifier', GradientBoostingClassifier(**model_params, random_state = seed + i))
+        ])  # different seed to mix things up
+        pipeline_perm.fit(X_train, y_train_shuffled)
+
+        # evaluate on test set with real labels
+        y_test_shuffled = np.array([sid_to_cond[subj] for subj in sid_test])
+        y_pred_perm = pipeline_perm.predict(X_test)
+        balanced_acc_perm = balanced_accuracy_score(y_test_shuffled, y_pred_perm)
         
         permuted_scores.append(balanced_acc_perm)
     
@@ -648,7 +666,7 @@ def permutation_test(df, selected_features, best_params, nperm = 100,
     print(f'\nConclusion: Real model performs {real_balanced_acc / perm_mean:.2f}x better than chance')
     
     # plot histogram of permuted scores with real score highlighted
-    fig, ax = plt.subplots(1, 1, figsize = (9, 4))
+    fig, ax = plt.subplots(1, 1, figsize = (4, 4))
     
     ax.hist(permuted_scores, bins = 50, alpha = 0.7, color = 'gray',
             edgecolor = 'black', label = 'Permuted models')
@@ -661,7 +679,7 @@ def permutation_test(df, selected_features, best_params, nperm = 100,
     ax.set_xlabel('Balanced accuracy')
     ax.set_ylabel('Density')
     ax.set_title('Real vs. permuted performance')
-    ax.legend(loc = 'upper right')
+    ax.legend(loc = 'upper left')
     
     plt.tight_layout()
     plt.show()
