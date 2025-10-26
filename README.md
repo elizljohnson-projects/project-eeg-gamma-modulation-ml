@@ -3,7 +3,7 @@
 
 Noninvasive brain stimulation is used across clinical, commercial, and research applications to change the brain in hopes of changing behavior, yet we don't fully understand how it changes brain activity. Using scalp EEG, we demonstrated that gamma frequency-tuned transcranial alternating current stimulation (tACS), but not transcranial direct current stimulation (tDCS), enhances auditory gamma responses in healthy adults ([Jones et al., 2020](https://doi.org/10.1152/jn.00003.2020)).
 
-This project is a re-analysis of Jones et al., 2020, aiming to classify stimulation conditions from single-trial gamma-band steady-state evoked potentials (SSEPs). Results demonstrate that machine learning with baseline-relative features can classify stimulation conditions (tACS, tDCS, Sham) at the single-trial level using data from a single EEG channel (Cz), achieving ~2× better-than-chance accuracy.
+This project is a re-analysis of Jones et al., 2020, aiming to classify stimulation conditions from single-trial gamma-band steady-state evoked potentials (SSEPs). Results demonstrate that machine learning with baseline-relative features can classify stimulation conditions (tACS, tDCS, Sham) at the single-trial level using data from a single EEG channel (Cz).
 
 Goal 1: Feature extraction and engineering
 - Characterize gamma-band SSEPs using spectral decomposition, time-domain analysis, and cycle-by-cycle waveform analysis
@@ -31,4 +31,4 @@ Software:
 
 Notes:
 - Run using the notebook `gamma_mod_ml.ipynb` with `gamma_utils.py`, `plotting_utils.py`, and `ml_utils.py` uploaded to the Colab File panel.
-- This notebook may take several hours to run due to hyperparameter tuning and permutation testing. Runtime GPU T4 is recommended.
+- This notebook may take several hours to run due to hyperparameter tuning and permutation testing.
