@@ -663,7 +663,6 @@ def permutation_test(df, selected_features, best_params, nperm = 100,
     print(f'  Max:    {perm_max:.3f}')
     print(f'  Median: {np.median(permuted_scores):.3f}')
     print(f'\np-value: {p_value:.4f}')    
-    print(f'\nConclusion: Real model performs {real_balanced_acc / perm_mean:.2f}x better than chance')
     
     # plot histogram of permuted scores with real score highlighted
     fig, ax = plt.subplots(1, 1, figsize = (4, 4))
