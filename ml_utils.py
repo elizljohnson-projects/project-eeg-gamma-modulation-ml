@@ -466,13 +466,15 @@ def test_feature_subsets(df, all_features, importances_df, best_params,
         # subset data to selected features
         X_train_subset = X_train_full[:, feature_indices]
         X_test_subset = X_test_full[:, feature_indices]
-        
-        # train model with tuned hyperparameters
-        model = GradientBoostingClassifier(**model_params, random_state = seed)
-        model.fit(X_train_subset, y_train)
+
+        # create and train pipeline with tuned hyperparameters
+        pipeline = Pipeline([
+            ('classifier', = GradientBoostingClassifier(**model_params, random_state = seed)
+         ])
+        pipeline.fit(X_train_subset, y_train)
         
         # evaluate
-        y_pred = model.predict(X_test_subset)
+        y_pred = pipeline.predict(X_test_subset)
         
         accuracy = accuracy_score(y_test, y_pred)
         balanced_acc = balanced_accuracy_score(y_test, y_pred)
