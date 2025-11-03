@@ -337,6 +337,8 @@ def rank_features(df, features, best_model):
         DataFrame with columns: sid, group, and feature columns
     features : list
         List of feature column names
+    best_model : object
+        Best performing model from tune_gradient_boosting()
         
     Returns:
     --------
